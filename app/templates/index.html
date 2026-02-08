@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1>OCR Localization Checker</h1>
+
+    <form action="/" method="post" enctype="multipart/form-data">
+      <input type="file" name="file" accept="image/*" required />
+      <button type="submit">Upload</button>
+    </form>
+
+    {% if result %}
+      <h2>Recognized text:</h2>
+      <pre>{{ result }}</pre>
+    {% endif %}
+  </body>
+</html>

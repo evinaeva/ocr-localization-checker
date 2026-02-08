@@ -1,0 +1,20 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+args: ['build', '-t', 'gcr.io/$project-d245d8c8-8548-47d2-a04/ocr-checker', '.']
+- name: 'gcr.io/cloud-builders/docker'
+args: ['push', 'gcr.io/$project-d245d8c8-8548-47d2-a04/ocr-checker']
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+entrypoint: gcloud
+args:
+- run
+- deploy
+- ocr-checker
+- --image
+- gcr.io/$project-d245d8c8-8548-47d2-a04/ocr-checker
+- --region
+- europe-west1
+- --platform
+- managed
+- --allow-unauthenticated
+- --service-account
+- ocr-service-account@$project-d245d8c8-8548-47d2-a04.iam.gserviceaccount.com
