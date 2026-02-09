@@ -3,9 +3,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from zip_processor import parse_zip  # 🔥 НОВЫЙ ИМПОРТ
 from app.ocr import process_image     # ⭐ СТАРЫЙ OCR (НЕ ТРОГАЕМ)
+import os
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")  # Предполагаем templates/index.html
+
+# 🔹 Определяем абсолютный путь к папке templates
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
