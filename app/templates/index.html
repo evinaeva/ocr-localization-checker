@@ -1,44 +1,104 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>OCR Localization Checker</title>
-    <style>table {border-collapse: collapse;} th, td {border: 1px solid #ddd; padding: 8px;}</style>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 16px;
+        }
+        h1 {
+            margin-bottom: 8px;
+        }
+        form {
+            margin-bottom: 24px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            vertical-align: top;
+        }
+        th {
+            background: #f5f5f5;
+            text-align: left;
+        }
+        .status-pass {
+            color: #0a7b34;
+            font-weight: 600;
+        }
+        .status-manual {
+            color: #c27803;
+            font-weight: 600;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin: 0;
+        }
+        .summary {
+            margin-bottom: 12px;
+        }
+    </style>
 </head>
 <body>
-    <h1>🚀 OCR Localization Checker</h1>
-    
-    {% if results %}
-        <h2>📊 Результаты: {{ total_files }} файлов</h2>
-        <p><strong>✅ PASS:</strong> {{ total_files - manual_count }} | <strong>❓ MANUAL:</strong> {{ manual_count }}</p>
-        
-        <table>
-            <tr>
-                <th>Image</th><th>Reference</th><th>OCR</th><th>Status</th>
-            </tr>
-            {% for path, data in results.items() %}
-            <tr style="background: {% if data.match %}#d4edda{% else %}#f8d7da{% endif %};">
-                <td>{{ path }}</td>
-                <td>{{ data.reference[:100] }}{% if data.reference|length > 100 %}...{% endif %}</td>
-                <td>{{ data.ocr[:100] }}{% if data.ocr|length > 100 %}...{% endif %}</td>
-                <td>
-                    {% if data.match %}
-                        <span style="color:green">✅ PASS</span>
-                    {% else %}
-                        <span style="color:orange">❓ MANUAL REVIEW</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
-        <p><a href="/">← Загрузить новый ZIP</a></p>
-    {% else %}
-        <form method="post" enctype="multipart/form-data">
-            <h3>📁 Загрузите ZIP архив</h3>
-            <p><small>images/banner_01_jp.png + texts/banner_01.txt</small></p>
-            <input type="file" name="zip_file" accept=".zip" required style="font-size: 20px;">
-            <br><br>
-            <button type="submit" style="padding: 15px 30px; font-size: 18px;">🚀 Проверить локализацию</button>
-        </form>
-    {% endif %}
+<h1>OCR Localization Checker</h1>
+
+<form action="/" method="post" enctype="multipart/form-data">
+    <label for="zip_file">Upload ZIP (images/ + texts/):</label>
+    <br>
+    <input type="file" id="zip_file" name="zip_file" accept=".zip" required>
+    <button type="submit">Run OCR</button>
+</form>
+
+{% if total_files is defined %}
+<div class="summary">
+    <strong>Total files:</strong> {{ total_files }}<br>
+    <strong>Manual review:</strong> {{ manual_count }}
+</div>
+{% endif %}
+
+{% if results %}
+<table>
+    <thead>
+    <tr>
+        <th>Image</th>
+        <th>Reference text</th>
+        <th>OCR (Google Vision)</th>
+        <th>OCR (EasyOCR)</th>
+        <th>Status</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for key, r in results.items() %}
+        <tr>
+            <td><pre>{{ r.image }}</pre></td>
+            <td><pre>{{ r.reference }}</pre></td>
+            <td><pre>{{ r.ocr_vision }}</pre></td>
+            <td><pre>{{ r.ocr_easy }}</pre></td>
+            <td>
+                {% if r.match %}
+                    <span class="status-pass">{{ r.status }}</span>
+                {% else %}
+                    <span class="status-manual">{{ r.status }}</span>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
 </body>
 </html>
