@@ -1,16 +1,44 @@
 <!DOCTYPE html>
 <html>
-  <body>
-    <h1>OCR Localization Checker</h1>
-
-    <form action="/" method="post" enctype="multipart/form-data">
-      <input type="file" name="file" accept="image/*" required />
-      <button type="submit">Upload</button>
-    </form>
-
-    {% if result %}
-      <h2>Recognized text:</h2>
-      <pre>{{ result }}</pre>
+<head>
+    <title>OCR Localization Checker</title>
+    <style>table {border-collapse: collapse;} th, td {border: 1px solid #ddd; padding: 8px;}</style>
+</head>
+<body>
+    <h1>🚀 OCR Localization Checker</h1>
+    
+    {% if results %}
+        <h2>📊 Результаты: {{ total_files }} файлов</h2>
+        <p><strong>✅ PASS:</strong> {{ total_files - manual_count }} | <strong>❓ MANUAL:</strong> {{ manual_count }}</p>
+        
+        <table>
+            <tr>
+                <th>Image</th><th>Reference</th><th>OCR</th><th>Status</th>
+            </tr>
+            {% for path, data in results.items() %}
+            <tr style="background: {% if data.match %}#d4edda{% else %}#f8d7da{% endif %};">
+                <td>{{ path }}</td>
+                <td>{{ data.reference[:100] }}{% if data.reference|length > 100 %}...{% endif %}</td>
+                <td>{{ data.ocr[:100] }}{% if data.ocr|length > 100 %}...{% endif %}</td>
+                <td>
+                    {% if data.match %}
+                        <span style="color:green">✅ PASS</span>
+                    {% else %}
+                        <span style="color:orange">❓ MANUAL REVIEW</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        <p><a href="/">← Загрузить новый ZIP</a></p>
+    {% else %}
+        <form method="post" enctype="multipart/form-data">
+            <h3>📁 Загрузите ZIP архив</h3>
+            <p><small>images/banner_01_jp.png + texts/banner_01.txt</small></p>
+            <input type="file" name="zip_file" accept=".zip" required style="font-size: 20px;">
+            <br><br>
+            <button type="submit" style="padding: 15px 30px; font-size: 18px;">🚀 Проверить локализацию</button>
+        </form>
     {% endif %}
-  </body>
+</body>
 </html>
