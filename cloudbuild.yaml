@@ -6,13 +6,13 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/ocr-checker'
+      - 'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker'
       - '.'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/ocr-checker'
+      - 'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
@@ -21,7 +21,7 @@ steps:
       - 'deploy'
       - 'ocr-checker'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/ocr-checker'
+      - 'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker'
       - '--region'
       - 'europe-west1'
       - '--platform'
