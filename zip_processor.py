@@ -4,22 +4,12 @@ import os
 import shutil
 from pathlib import Path
 from typing import List, Tuple
+from io import BytesIO  # ← добавить
 from docx import Document
 
 
 def parse_zip_streaming(zip_path: str) -> List[Tuple[str, str, str]]:
-    """
-    Стриминговая версия.
-
-    Возвращает список:
-    (img_path, image_tmp_path, reference_text)
-
-    Логика matching сохранена:
-    banner_01_jp.png → banner_01 → matching с texts/*
-    """
-
     results = []
-
     work_dir = tempfile.mkdtemp(prefix="ocr_zip_")
 
     images = {}
@@ -30,11 +20,9 @@ def parse_zip_streaming(zip_path: str) -> List[Tuple[str, str, str]]:
             for info in zf.infolist():
                 name = info.filename
 
-                # Пропускаем директории
                 if name.endswith("/"):
                     continue
 
-                # --- IMAGES ---
                 if name.startswith("images/") and name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
                     base_name = os.path.basename(name)
                     tmp_img_path = os.path.join(work_dir, base_name)
@@ -44,16 +32,13 @@ def parse_zip_streaming(zip_path: str) -> List[Tuple[str, str, str]]:
 
                     images[name] = tmp_img_path
 
-                # --- TEXTS ---
                 if name.startswith("texts/") and name.lower().endswith((".txt", ".docx")):
                     with zf.open(info) as src:
                         txt_bytes = src.read()
-
                     texts[name] = txt_bytes
 
-        # --- MATCHING LOGIC (как у тебя) ---
         for img_path, img_tmp_path in images.items():
-            prefix = "_".join(Path(img_path).stem.split("_")[:-1])  # banner_01 из banner_01_jp
+            prefix = "_".join(Path(img_path).stem.split("_")[:-1])
 
             ref_text = ""
             for txt_path, txt_bytes in texts.items():
@@ -75,7 +60,7 @@ def extract_text(file_bytes: bytes, ext: str) -> str:
         return file_bytes.decode("utf-8", errors="ignore").strip()
 
     if ext == ".docx":
-        doc = Document(file_bytes)
+        doc = Document(BytesIO(file_bytes))  # ← ключевое изменение
         return "\n".join(p.text.strip() for p in doc.paragraphs if p.text.strip())
 
     return ""
