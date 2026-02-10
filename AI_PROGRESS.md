@@ -35,3 +35,26 @@ Implement ZIP archive processing:
 - Modify minimal files
 - Prefer adding modules instead of replacing main.py
 - After completing a task: update this file
+
+апдейт 10.02
+## Что уже работает
+- Рабочий деплой на Cloud Run.
+- Автоматический пайплайн GitHub → Cloud Build → Cloud Run.
+- OCR через Google Vision для одиночного изображения.
+- Веб‑форма загрузки.
+- ✅ **Создана база Firestore (Native mode) в регионе europe‑west1 для хранения статусов заданий.**
+- ✅ **Создан топик Pub/Sub `ocr‑jobs` для постановки задач в очередь.**
+
+## Последняя выполненная задача
+Настроена инфраструктура: создана Firestore (native mode) и топик Pub/Sub `ocr‑jobs`.
+
+## Текущая задача (не повторять предыдущее!)
+- Реализовать API‑эндпоинты для создания Job и публикации задания в Pub/Sub.
+- Разработать воркер‑сервис, который подписывается на `ocr‑jobs`, выполняет OCR и обновляет статус в Firestore.
+
+## Следующие задачи (приоритет снижается сверху вниз)
+1. Извлечение текста из TXT/DOCX.
+2. Сравнение строк на полное совпадение.
+3. Таблица результатов в UI.
+4. Режим ручной проверки.
+
