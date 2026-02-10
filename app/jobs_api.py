@@ -74,10 +74,10 @@ async def create_job(zip_file: UploadFile = File(...)) -> Dict[str, Any]:
     # 3) Publish в Pub/Sub
     msg = {"job_id": job_id, "gcs_uri": gcs_uri}
     future = publisher.publish(topic_path, json.dumps(msg).encode("utf-8"))
-future.result()
-
+    future.result()
 
     return {"job_id": job_id}
+
 
 
 @router.get("/jobs/{job_id}")
