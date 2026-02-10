@@ -59,3 +59,10 @@ Implement ZIP archive processing:
 4. Режим ручной проверки.
 
 ✅ Добавлены API endpoints: POST /jobs (создаёт job, грузит ZIP в GCS, публикует Pub/Sub), GET /jobs/{job_id} (читает Firestore)
+“Как задеплоить worker” (без выполнения):
+
+build: gcloud builds submit --tag ...
+
+deploy: gcloud run deploy ocr-worker ...
+
+subscription push: gcloud pubsub subscriptions create ... --push-endpoint=https://.../pubsub/push
