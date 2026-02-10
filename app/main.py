@@ -1,14 +1,21 @@
 import tempfile
 import os
+from pathlib import Path
+
 from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+
 from zip_processor import parse_zip_streaming
 from app.ocr import process_image
 
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+# --- Определяем базовую директорию и шаблоны ---
+BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+app = FastAPI()
+from app.jobs_api import router as jobs_router
+app.include_router(jobs_router)
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -38,6 +45,7 @@ async def upload_zip(request: Request, zip_file: UploadFile = File(...)):
 
         results = {}
 
+        # Ограничиваемся первыми 10 файлами для теста / снижения нагрузки
         for img_path, img_file_path, ref_text in list(matches)[:10]:
             with open(img_file_path, "rb") as f:
                 img_bytes = f.read()
@@ -68,6 +76,6 @@ async def upload_zip(request: Request, zip_file: UploadFile = File(...)):
         )
 
     finally:
-        # 3. Гарантированно чистим ZIP
+        # 3. Гарантированно чистим временный ZIP
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
