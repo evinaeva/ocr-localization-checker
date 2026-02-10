@@ -58,3 +58,4 @@ Implement ZIP archive processing:
 3. Таблица результатов в UI.
 4. Режим ручной проверки.
 
+✅ Добавлены API endpoints: POST /jobs (создаёт job, грузит ZIP в GCS, публикует Pub/Sub), GET /jobs/{job_id} (читает Firestore)
