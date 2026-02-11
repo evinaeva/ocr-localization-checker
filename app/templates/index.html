@@ -76,8 +76,7 @@
         <th>Image</th>
         <th>Reference text</th>
         <th>OCR (Google Vision)</th>
-        <th>OCR (EasyOCR)</th>
-        <th>Status</th>
+                <th>Status</th>
     </tr>
     </thead>
     <tbody>
@@ -86,7 +85,6 @@
             <td><pre>{{ r.image }}</pre></td>
             <td><pre>{{ r.reference }}</pre></td>
             <td><pre>{{ r.ocr_vision }}</pre></td>
-            <td><pre>{{ r.ocr_easy }}</pre></td>
             <td>
                 {% if r.match %}
                     <span class="status-pass">{{ r.status }}</span>

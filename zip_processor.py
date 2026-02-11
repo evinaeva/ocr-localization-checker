@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 from typing import List, Tuple
 from docx import Document
+import io
 
 
 def parse_zip_streaming(zip_path: str) -> List[Tuple[str, str, str]]:
@@ -75,7 +76,7 @@ def extract_text(file_bytes: bytes, ext: str) -> str:
         return file_bytes.decode("utf-8", errors="ignore").strip()
 
     if ext == ".docx":
-        doc = Document(file_bytes)
+        doc = Document(io.BytesIO(file_bytes))
         return "\n".join(p.text.strip() for p in doc.paragraphs if p.text.strip())
 
     return ""

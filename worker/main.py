@@ -28,6 +28,7 @@ def _update_job(job_id: str, **fields):
 @app.post("/pubsub/push")
 async def pubsub_push(request: Request):
     body = await request.json()
+    print('PUBSUB_PUSH_BODY=' + json.dumps(body, ensure_ascii=False))
 
     # Pub/Sub push format: { "message": {"data": "base64..."}, "subscription": "..." }
     msg = body.get("message")
