@@ -1,3 +1,185 @@
+________________________________________________________
+Updates
+________________________________________________________
+PROJECT_CONTEXT — UPDATE 2026-02-11 (POST-FIX SYSTEM STATE)
+
+Important: System state has materially changed.
+
+The architecture is no longer under debugging.
+The system has been verified working end-to-end in production.
+
+Verified facts:
+
+• Worker deployed with updated container image
+• Pub/Sub push delivers successfully (HTTP 200)
+• Firestore documents reach status DONE
+• result.results contains OCR output
+• UI renders OCR text and status correctly
+
+Vision API
+
+Earlier documentation mentioned:
+
+"Vision API error: Request contains an invalid argument."
+
+This is no longer an active issue.
+
+Debug instrumentation confirmed:
+
+• Valid image bytes are passed to vision.Image(content=...)
+• Correct JPEG magic bytes detected
+• OCR returns valid text
+
+Conclusion:
+Vision request construction is correct in current worker revision.
+
+Frontend alignment
+
+Earlier issue:
+UI expected r.ocr_vision and r.status.
+
+Current state:
+UI template aligned with worker output:
+    r.ocr
+    r.match → PASS / MANUAL
+
+Frontend and Firestore structure are now consistent.
+
+Architectural status
+
+The distributed asynchronous pipeline is confirmed operational:
+
+API (Cloud Run)  
+→ Pub/Sub topic  
+→ Push subscription  
+→ Worker (Cloud Run)  
+→ Firestore  
+→ UI render
+
+No current infrastructure blockers exist.
+
+Phase transition
+
+Project has moved from:
+
+"Cloud architecture validation"
+
+to:
+
+"Application logic refinement and production hardening".
+
+Future improvements are incremental, not structural.
+
+
+
+
+
+PROJECT_CONTEXT — UPDATE 2026-02-11 (system state verified)
+Important: architecture status changed
+
+The distributed pipeline is no longer hypothetical.
+It has been observed working end-to-end in production.
+
+A real job execution completed the full chain:
+
+User upload → Cloud Storage → Pub/Sub push → Cloud Run worker → Google Vision → Firestore write
+
+Observed facts:
+
+• Pub/Sub push returned HTTP 200
+• Worker processed the job
+• Firestore document reached status: DONE
+• updated_at changed after processing
+• result object was written to Firestore
+
+Conclusion:
+Cloud Run, Pub/Sub, Firestore, IAM permissions, and async processing are operational.
+
+This project is not currently blocked by infrastructure.
+
+Worker runtime confirmation
+
+Active worker revision is running a new container image:
+
+image digest:
+sha256:1823c8e4abefa4e42e3f7f545aa8bad2b1f885d28842dc5639b5058ef327385e
+
+Container conditions:
+Ready / Healthy / Active = succeeded
+
+Therefore the system is executing real jobs on the updated worker.
+
+Actual current failure class
+
+The system now fails at the application layer, not the cloud layer.
+
+Two concrete problems remain:
+
+1. Google Vision request failure
+
+Firestore result contains:
+
+Vision API error: Request contains an invalid argument.
+
+This indicates:
+the worker successfully calls Vision API, but the request payload is malformed.
+
+Possible areas:
+• image bytes encoding
+• content type
+• empty/invalid image
+• incorrect API request construction
+
+This is currently the primary backend bug.
+
+2. UI result rendering mismatch
+
+Worker writes OCR output to Firestore at:
+
+result.results[<image_path>].ocr
+
+The UI does not display the OCR text even when the job is DONE.
+
+Therefore:
+the frontend template is reading a different field than the one written by the worker.
+
+This is now the primary frontend bug.
+
+Important behavioral model (now confirmed)
+
+The worker is a stateless single-job processor:
+
+one Pub/Sub push → one job → one Firestore update
+
+No internal queue or polling loop exists.
+
+Tooling constraint discovered
+
+gcloud run ... commands are unreliable in this Cloud Shell environment
+(they frequently crash with TypeError: string indices must be integers).
+
+Service inspection must be done using the Cloud Run Admin REST API instead of gcloud CLI when necessary.
+
+Phase transition of the project
+
+The project has moved from:
+
+“cloud deployment and async system debugging”
+
+to:
+
+“application logic debugging”
+
+Remaining work is limited to:
+
+fixing Vision API request construction
+
+aligning UI template with Firestore result structure
+
+__________________________________________________
+
+First revision
+__________________________________________________
 OCR Localization Checker – Technical Context
 and Architecture Document
 Introduction
