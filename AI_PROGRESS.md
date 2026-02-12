@@ -3,6 +3,90 @@ ____________________________________________________________________________
 Updates
 ____________________________________________________________________________
 
+# AI_PROGRESS — UPDATE 2026-02-12 (Normalization deployed; job stuck in PENDING)
+
+## What was completed (facts)
+
+### A) Matching logic improvement (worker)
+- Implemented strict/soft normalization module:
+  - `worker/normalization.py` with:
+    - `normalize_strict(text)`
+    - `normalize_soft(text)`
+- Added local test vectors snapshot:
+  - `test_vectors/normalization_test_vectors.json`
+- Added unit tests:
+  - `tests/test_normalization.py`
+- Local tests confirmed:
+  - `python3 -m pytest -q` → **16 passed**
+
+### B) Worker matching now uses normalize_strict
+- In `worker/main.py`:
+  - Added import: `from worker.normalization import normalize_strict`
+  - Replaced comparison:
+    - from: `ocr_text.strip() == ref_text.strip()`
+    - to: `normalize_strict(ocr_text) == normalize_strict(ref_text)`
+- Sanity check confirmed:
+  - `python3 -m py_compile worker/main.py` → OK
+
+### C) Deployment: ocr-worker updated
+- Confirmed current image in Cloud Run before deploy:
+  - `europe-north1-docker.pkg.dev/.../ocr-worker:latest`
+- Cloud Build:
+  - First attempt failed due to wrong build context (used `./worker`): Dockerfile expected `worker/requirements.txt`.
+  - Fixed by building from repo root:
+    - `gcloud builds submit --tag europe-north1-docker.pkg.dev/.../ocr-worker:latest .`
+- Cloud Run deploy succeeded:
+  - `gcloud run deploy ocr-worker --region europe-west1 --image .../ocr-worker:latest`
+- Current serving revision:
+  - **ocr-worker-00009-jj5** serving 100% traffic
+- Verified via Cloud Run Admin REST:
+  - `latestReadyRevision` points to **ocr-worker-00009-jj5**
+  - (Traffic field may show empty revision with 100% for “latest”)
+
+### D) Verification tooling
+- Confirmed ocr-checker URL via Cloud Run Admin REST:
+  - `https://ocr-checker-mgrzq6p2ga-ew.a.run.app`
+- Confirmed OpenAPI:
+  - Endpoints: `/jobs`, `/jobs/{job_id}`, `/`
+  - POST `/jobs` uses multipart/form-data with required field **`zip_file`**
+
+## Current issue (regression / unverified)
+### Jobs remain stuck in PENDING
+- Created a minimal test ZIP in Cloud Shell (`strict_test.zip`):
+  - `texts/test_en.txt`: `Hello World\nFrom OCR`
+  - `images/test_en.png` uploaded by user
+- Job created successfully:
+  - POST `/jobs` returned job_id: `d5a696a9-6977-49f6-b9ee-7280325e0754`
+- But GET `/jobs/{job_id}` remains:
+  - `status: PENDING`
+  - `result: null`
+  - `error: null`
+  - `updated_at` unchanged
+
+## Pub/Sub delivery checks (facts)
+- Subscription exists and points to worker:
+  - subscription: `ocr-worker-push`
+  - topic: `ocr-jobs`
+  - pushEndpoint: `https://ocr-worker-1018698441568.europe-west1.run.app/pubsub/push`
+  - ackDeadlineSeconds: 10
+  - deadLetterPolicy: false
+
+## Hypothesis to validate next (needs factual checks)
+Most likely causes now:
+1) Cloud Run invoker IAM / authentication mismatch (Pub/Sub push receiving 401/403)
+2) Worker push handler returning non-200 due to request validation (even if IAM OK)
+3) Publish from ocr-checker not actually happening (less likely given job stays PENDING, needs code inspection)
+
+## Next concrete steps (do not batch; one command per step)
+1) Inspect subscription pushConfig for OIDC settings (oidcToken/audience)
+2) Inspect Cloud Run ocr-worker IAM policy (roles/run.invoker bindings)
+3) Inspect Cloud Run ocr-worker runtime service account
+4) If IAM OK: inspect worker `/pubsub/push` handler code for 4xx paths
+
+## Known constraint
+- Cloud Build SA cannot write Cloud Logging (roles/logging.logWriter missing). This is informational; builds still succeed.
+
+
 AI_PROGRESS — UPDATE 2026-02-11 (POST-FIX STATE)
 
 System status has changed again. Previous notes about Vision API failure and UI mismatch are no longer accurate.
