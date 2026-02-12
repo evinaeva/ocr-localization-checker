@@ -2,6 +2,43 @@ ________________________________________________________
 
 Updates
 ________________________________________________________
+
+PROJECT_CONTEXT — UPDATE 2026-02-12 (worker OK; checker deploy failure explained; fix required)
+
+Подтверждённая архитектура (без изменений)
+User → Cloud Run ocr-checker → Pub/Sub topic ocr-jobs → push sub ocr-worker-push → Cloud Run ocr-worker → Firestore (Native)
+
+Статус воркера (ocr-worker) — OK, корректный обработчик Pub/Sub
+
+ocr-worker реально обслуживает POST /pubsub/push (на {} возвращает 400 “Invalid Pub/Sub message”, то есть маршрут существует).
+
+В Artifact Registry добавлен pinned tag:
+
+.../ocr-worker:prod-20260212 (указывает на рабочий образ workerfix-1770893776).
+
+Пайплайн обработал реальные job’ы до DONE и записал результат в Firestore.
+
+Новая проблема (ocr-checker) — деплой падает из-за падения приложения при старте
+
+Cloud Build (trigger github-trigger) собирает и пушит образ ocr-checker, но шаг gcloud run deploy ocr-checker падает с ошибкой “container failed to start and listen on PORT=8080”.
+
+Root cause по runtime-логам контейнера:
+
+SyntaxError: invalid syntax в zip_processor.py на строке с <<<<<<< HEAD (оставшиеся merge conflict markers).
+
+Из-за этого uvicorn не может импортировать приложение (app.main тянет zip_processor) и не поднимает сервер на 8080.
+
+Что должно быть сделано в репозитории (фикс)
+
+Полностью убрать merge-маркеры из zip_processor.py и оставить один рабочий вариант импорта/использования BytesIO (или io.BytesIO) так, чтобы:
+
+python3 -m py_compile zip_processor.py проходит локально
+
+контейнер запускается и начинает слушать порт 8080
+
+После этого автодеплой ocr-checker через Cloud Build должен восстановиться.
+
+
 PROJECT_CONTEXT — UPDATE 2026-02-12 (System operational; worker correctly serving Pub/Sub push)
 
 Current confirmed architecture (unchanged):
