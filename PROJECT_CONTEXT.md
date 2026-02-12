@@ -1,6 +1,49 @@
 ________________________________________________________
+
 Updates
 ________________________________________________________
+PROJECT_CONTEXT — UPDATE 2026-02-12 (System operational; worker correctly serving Pub/Sub push)
+
+Current confirmed architecture (unchanged):
+User → Cloud Run ocr-checker → Pub/Sub ocr-jobs → push sub ocr-worker-push → Cloud Run ocr-worker → Firestore (Native)
+
+Critical operational fact (resolved regression):
+
+ocr-worker now runs the correct app (worker.main:app) and exposes /pubsub/push.
+
+Validation:
+
+Worker /openapi.json no longer matches checker (expected after fix)
+
+POST /pubsub/push returns 400 Invalid Pub/Sub message for invalid payload, i.e., route exists.
+
+Current production identifiers (factual):
+
+Project: project-d245d8c8-8548-47d2-a04
+
+Region: europe-west1
+
+Worker URL: https://ocr-worker-1018698441568.europe-west1.run.app
+
+Checker URL: https://ocr-checker-mgrzq6p2ga-ew.a.run.app
+
+Active worker revision: ocr-worker-00012-bjb
+
+Worker image: .../ocr-worker:workerfix-1770893776
+
+Pinned tag: .../ocr-worker:prod-20260212
+
+Verification evidence (factual):
+
+Job processing confirmed twice:
+
+d5a696a9-6977-49f6-b9ee-7280325e0754 → DONE
+
+7284516b-8096-45b5-87c6-60d87e3fecd9 → DONE
+
+Results include ocr, reference, and match: true.
+
+
 # PROJECT_CONTEXT — UPDATE 2026-02-12 (Normalization deployed; PENDING regression)
 
 ## Confirmed architecture (unchanged)
