@@ -1,3 +1,270 @@
+________________________________________________________
+Updates
+________________________________________________________
+# PROJECT_CONTEXT — UPDATE 2026-02-12 (Normalization deployed; PENDING regression)
+
+## Confirmed architecture (unchanged)
+User
+→ Cloud Run `ocr-checker` (UI/API)
+→ Pub/Sub topic `ocr-jobs`
+→ Push subscription `ocr-worker-push`
+→ Cloud Run `ocr-worker`
+→ Firestore (Native)
+
+Region: europe-west1
+Artifact Registry: europe-north1
+Project: project-d245d8c8-8548-47d2-a04
+
+## Confirmed service endpoints (facts)
+- ocr-checker URL:
+  - https://ocr-checker-mgrzq6p2ga-ew.a.run.app
+- ocr-worker URL:
+  - https://ocr-worker-1018698441568.europe-west1.run.app
+
+## API contract (facts)
+- OpenAPI lists:
+  - `POST /jobs`
+  - `GET /jobs/{job_id}`
+- `POST /jobs` expects multipart/form-data with required binary field:
+  - `zip_file`
+
+## Matching logic (implemented + deployed)
+Goal: improve match quality without changing architecture.
+
+### Implemented modules
+- `worker/normalization.py`:
+  - `normalize_strict(text)`
+  - `normalize_soft(text)`
+- Tests:
+  - `tests/test_normalization.py`
+  - `test_vectors/normalization_test_vectors.json`
+- Local verification:
+  - pytest passes (16 test vectors)
+
+### Worker comparison changed
+- In worker, match now computed as:
+  - `normalize_strict(ocr_text) == normalize_strict(ref_text)`
+(Previously was `strip()==strip()`.)
+
+## Current production deployment (facts)
+- `ocr-worker` deployed from image:
+  - europe-north1-docker.pkg.dev/.../ocr-worker:latest
+- Latest ready revision:
+  - ocr-worker-00009-jj5
+- Serving traffic:
+  - 100% to latest
+
+## Current system problem (facts)
+A newly created job is stuck in PENDING:
+- job_id: d5a696a9-6977-49f6-b9ee-7280325e0754
+- GET /jobs/{job_id} returns:
+  - status: PENDING
+  - result: null
+  - error: null
+  - updated_at unchanged
+
+This indicates the async step (Pub/Sub push → worker processing → Firestore update) is not completing for this job.
+
+## Pub/Sub push configuration (facts)
+Subscription `ocr-worker-push`:
+- topic: projects/.../topics/ocr-jobs
+- pushEndpoint: https://ocr-worker-.../pubsub/push
+- ackDeadlineSeconds: 10
+- deadLetterPolicy: false
+
+## What is NOT yet confirmed (unknown; requires further checks)
+- Whether push subscription uses OIDC token (pushConfig.oidcToken)
+- Cloud Run invoker IAM bindings for ocr-worker (roles/run.invoker)
+- Runtime service account of ocr-worker
+- Whether worker push handler can return non-200 on valid Pub/Sub delivery
+
+## Next diagnostics actions (must be executed as single-step commands)
+1) Fetch subscription pushConfig to confirm OIDC/audience
+2) Fetch ocr-worker IAM policy (getIamPolicy) to confirm invoker permissions
+3) Fetch ocr-worker runtime serviceAccount from Cloud Run service spec
+4) If IAM OK, review worker `/pubsub/push` handler code for validation-induced 4xx
+
+
+
+PROJECT_CONTEXT — UPDATE 2026-02-11 (POST-FIX SYSTEM STATE)
+
+Important: System state has materially changed.
+
+The architecture is no longer under debugging.
+The system has been verified working end-to-end in production.
+
+Verified facts:
+
+• Worker deployed with updated container image
+• Pub/Sub push delivers successfully (HTTP 200)
+• Firestore documents reach status DONE
+• result.results contains OCR output
+• UI renders OCR text and status correctly
+
+Vision API
+
+Earlier documentation mentioned:
+
+"Vision API error: Request contains an invalid argument."
+
+This is no longer an active issue.
+
+Debug instrumentation confirmed:
+
+• Valid image bytes are passed to vision.Image(content=...)
+• Correct JPEG magic bytes detected
+• OCR returns valid text
+
+Conclusion:
+Vision request construction is correct in current worker revision.
+
+Frontend alignment
+
+Earlier issue:
+UI expected r.ocr_vision and r.status.
+
+Current state:
+UI template aligned with worker output:
+    r.ocr
+    r.match → PASS / MANUAL
+
+Frontend and Firestore structure are now consistent.
+
+Architectural status
+
+The distributed asynchronous pipeline is confirmed operational:
+
+API (Cloud Run)  
+→ Pub/Sub topic  
+→ Push subscription  
+→ Worker (Cloud Run)  
+→ Firestore  
+→ UI render
+
+No current infrastructure blockers exist.
+
+Phase transition
+
+Project has moved from:
+
+"Cloud architecture validation"
+
+to:
+
+"Application logic refinement and production hardening".
+
+Future improvements are incremental, not structural.
+
+
+
+
+
+PROJECT_CONTEXT — UPDATE 2026-02-11 (system state verified)
+Important: architecture status changed
+
+The distributed pipeline is no longer hypothetical.
+It has been observed working end-to-end in production.
+
+A real job execution completed the full chain:
+
+User upload → Cloud Storage → Pub/Sub push → Cloud Run worker → Google Vision → Firestore write
+
+Observed facts:
+
+• Pub/Sub push returned HTTP 200
+• Worker processed the job
+• Firestore document reached status: DONE
+• updated_at changed after processing
+• result object was written to Firestore
+
+Conclusion:
+Cloud Run, Pub/Sub, Firestore, IAM permissions, and async processing are operational.
+
+This project is not currently blocked by infrastructure.
+
+Worker runtime confirmation
+
+Active worker revision is running a new container image:
+
+image digest:
+sha256:1823c8e4abefa4e42e3f7f545aa8bad2b1f885d28842dc5639b5058ef327385e
+
+Container conditions:
+Ready / Healthy / Active = succeeded
+
+Therefore the system is executing real jobs on the updated worker.
+
+Actual current failure class
+
+The system now fails at the application layer, not the cloud layer.
+
+Two concrete problems remain:
+
+1. Google Vision request failure
+
+Firestore result contains:
+
+Vision API error: Request contains an invalid argument.
+
+This indicates:
+the worker successfully calls Vision API, but the request payload is malformed.
+
+Possible areas:
+• image bytes encoding
+• content type
+• empty/invalid image
+• incorrect API request construction
+
+This is currently the primary backend bug.
+
+2. UI result rendering mismatch
+
+Worker writes OCR output to Firestore at:
+
+result.results[<image_path>].ocr
+
+The UI does not display the OCR text even when the job is DONE.
+
+Therefore:
+the frontend template is reading a different field than the one written by the worker.
+
+This is now the primary frontend bug.
+
+Important behavioral model (now confirmed)
+
+The worker is a stateless single-job processor:
+
+one Pub/Sub push → one job → one Firestore update
+
+No internal queue or polling loop exists.
+
+Tooling constraint discovered
+
+gcloud run ... commands are unreliable in this Cloud Shell environment
+(they frequently crash with TypeError: string indices must be integers).
+
+Service inspection must be done using the Cloud Run Admin REST API instead of gcloud CLI when necessary.
+
+Phase transition of the project
+
+The project has moved from:
+
+“cloud deployment and async system debugging”
+
+to:
+
+“application logic debugging”
+
+Remaining work is limited to:
+
+fixing Vision API request construction
+
+aligning UI template with Firestore result structure
+
+__________________________________________________
+
+First revision
+__________________________________________________
 OCR Localization Checker – Technical Context
 and Architecture Document
 Introduction
