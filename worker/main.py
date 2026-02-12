@@ -10,6 +10,7 @@ from google.cloud import storage
 # Используем существующий парсер ZIP из вашего проекта
 from zip_processor import parse_zip_streaming
 from app.ocr import process_image
+from worker.normalization import normalize_strict
 
 GCP_PROJECT_ID = "project-d245d8c8-8548-47d2-a04"
 UPLOAD_BUCKET = "ocr-checker-uploads-1018698441568"
@@ -61,14 +62,33 @@ async def pubsub_push(request: Request):
             with open(img_file_path, "rb") as f:
                 img_bytes = f.read()
 
+                head = img_bytes[:16]
+                head_hex = head.hex()
+                # rough format guess by magic bytes
+                if head.startswith(b"\x89PNG\r\n\x1a\n"):
+                    fmt = "png"
+                elif head.startswith(b"\xff\xd8\xff"):
+                    fmt = "jpeg"
+                elif len(head) >= 12 and head[0:4] == b"RIFF" and head[8:12] == b"WEBP":
+                    fmt = "webp"
+                else:
+                    fmt = "unknown"
+
             ocr_text = process_image(img_bytes)
-            is_match = ocr_text.strip() == ref_text.strip()
+            is_match = normalize_strict(ocr_text) == normalize_strict(ref_text)
+
 
             results[img_path] = {
                 "image": img_path,
                 "reference": ref_text,
                 "ocr": ocr_text,
                 "match": is_match,
+                "_debug": {
+                    "bytes_len": len(img_bytes),
+                    "head_hex": head_hex,
+                    "fmt_guess": fmt,
+                    "tmp_path": img_file_path,
+                },
             }
 
         _update_job(job_id, status="DONE", result={"results": results, "total": len(matches)})

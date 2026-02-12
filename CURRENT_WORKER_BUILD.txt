@@ -1,0 +1,3 @@
+date_utc: 2026-02-12T12:35:23.570449Z
+latestReadyRevision: projects/project-d245d8c8-8548-47d2-a04/locations/europe-west1/services/ocr-worker/revisions/ocr-worker-00012-bjb
+image: europe-north1-docker.pkg.dev/project-d245d8c8-8548-47d2-a04/ocr-checker/ocr-worker:workerfix-1770893776
