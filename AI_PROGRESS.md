@@ -3,6 +3,64 @@ ____________________________________________________________________________
 Updates
 ____________________________________________________________________________
 
+AI_PROGRESS — UPDATE 2026-02-12 (PENDING fixed; worker restored; release pinned)
+
+What was fixed (root cause, factual):
+
+Jobs stuck in PENDING were caused by ocr-worker serving the checker API instead of the worker handler.
+
+Evidence:
+
+POST /pubsub/push on worker URL returned 404 Not Found
+
+openapi.json on worker URL exposed ['/', '/jobs', '/jobs/{job_id}'] (same as checker)
+
+Fix applied (factual):
+
+Dockerfile corrected to run worker app:
+
+from CMD ["uvicorn","app.main:app", ...]
+
+to CMD ["uvicorn","worker.main:app", ...]
+
+New image built and deployed:
+
+Cloud Run ocr-worker revision now: ocr-worker-00012-bjb
+
+Image: .../ocr-worker:workerfix-1770893776
+
+Worker endpoint now exists:
+
+POST /pubsub/push returns 400 {"detail":"Invalid Pub/Sub message"} for {} (expected for invalid payload)
+
+End-to-end verification (factual):
+
+Previously stuck job moved to DONE with match: true:
+
+job_id d5a696a9-6977-49f6-b9ee-7280325e0754
+
+New independent job also completed immediately:
+
+job_id 7284516b-8096-45b5-87c6-60d87e3fecd9
+
+Both jobs produced result.results[...].ocr and match: true.
+
+Release pinning in Google Cloud (factual):
+
+Artifact Registry tag added:
+
+.../ocr-worker:prod-20260212 points to the same image as workerfix-1770893776.
+
+Git status (partly factual):
+
+Local commits created:
+
+release commit + merge commit (conflict resolved in zip_processor.py).
+
+GitHub push: не знаю (в этом чате нет вывода успешного git push после merge).
+
+
+
 # AI_PROGRESS — UPDATE 2026-02-12 (Normalization deployed; job stuck in PENDING)
 
 ## What was completed (facts)
