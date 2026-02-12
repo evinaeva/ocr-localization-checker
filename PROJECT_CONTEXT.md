@@ -1,6 +1,91 @@
 ________________________________________________________
 Updates
 ________________________________________________________
+# PROJECT_CONTEXT — UPDATE 2026-02-12 (Normalization deployed; PENDING regression)
+
+## Confirmed architecture (unchanged)
+User
+→ Cloud Run `ocr-checker` (UI/API)
+→ Pub/Sub topic `ocr-jobs`
+→ Push subscription `ocr-worker-push`
+→ Cloud Run `ocr-worker`
+→ Firestore (Native)
+
+Region: europe-west1
+Artifact Registry: europe-north1
+Project: project-d245d8c8-8548-47d2-a04
+
+## Confirmed service endpoints (facts)
+- ocr-checker URL:
+  - https://ocr-checker-mgrzq6p2ga-ew.a.run.app
+- ocr-worker URL:
+  - https://ocr-worker-1018698441568.europe-west1.run.app
+
+## API contract (facts)
+- OpenAPI lists:
+  - `POST /jobs`
+  - `GET /jobs/{job_id}`
+- `POST /jobs` expects multipart/form-data with required binary field:
+  - `zip_file`
+
+## Matching logic (implemented + deployed)
+Goal: improve match quality without changing architecture.
+
+### Implemented modules
+- `worker/normalization.py`:
+  - `normalize_strict(text)`
+  - `normalize_soft(text)`
+- Tests:
+  - `tests/test_normalization.py`
+  - `test_vectors/normalization_test_vectors.json`
+- Local verification:
+  - pytest passes (16 test vectors)
+
+### Worker comparison changed
+- In worker, match now computed as:
+  - `normalize_strict(ocr_text) == normalize_strict(ref_text)`
+(Previously was `strip()==strip()`.)
+
+## Current production deployment (facts)
+- `ocr-worker` deployed from image:
+  - europe-north1-docker.pkg.dev/.../ocr-worker:latest
+- Latest ready revision:
+  - ocr-worker-00009-jj5
+- Serving traffic:
+  - 100% to latest
+
+## Current system problem (facts)
+A newly created job is stuck in PENDING:
+- job_id: d5a696a9-6977-49f6-b9ee-7280325e0754
+- GET /jobs/{job_id} returns:
+  - status: PENDING
+  - result: null
+  - error: null
+  - updated_at unchanged
+
+This indicates the async step (Pub/Sub push → worker processing → Firestore update) is not completing for this job.
+
+## Pub/Sub push configuration (facts)
+Subscription `ocr-worker-push`:
+- topic: projects/.../topics/ocr-jobs
+- pushEndpoint: https://ocr-worker-.../pubsub/push
+- ackDeadlineSeconds: 10
+- deadLetterPolicy: false
+
+## What is NOT yet confirmed (unknown; requires further checks)
+- Whether push subscription uses OIDC token (pushConfig.oidcToken)
+- Cloud Run invoker IAM bindings for ocr-worker (roles/run.invoker)
+- Runtime service account of ocr-worker
+- Whether worker push handler can return non-200 on valid Pub/Sub delivery
+
+## Next diagnostics actions (must be executed as single-step commands)
+1) Fetch subscription pushConfig to confirm OIDC/audience
+2) Fetch ocr-worker IAM policy (getIamPolicy) to confirm invoker permissions
+3) Fetch ocr-worker runtime serviceAccount from Cloud Run service spec
+4) If IAM OK, review worker `/pubsub/push` handler code for validation-induced 4xx
+
+
+
 PROJECT_CONTEXT — UPDATE 2026-02-11 (POST-FIX SYSTEM STATE)
 
 Important: System state has materially changed.
