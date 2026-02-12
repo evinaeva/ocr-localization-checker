@@ -3,6 +3,46 @@ ____________________________________________________________________________
 Updates
 ____________________________________________________________________________
 
+AI_PROGRESS — UPDATE 2026-02-12 (worker fixed & pinned; checker deploy broken by merge markers; root cause identified)
+
+A) Worker (ocr-worker) восстановлен и подтверждён E2E
+
+Root cause прежних PENDING: ocr-worker обслуживал не тот FastAPI (эндпоинты совпадали с checker), поэтому /pubsub/push отдавал 404.
+
+Исправление: в образе воркера исправлен запуск на worker.main:app (CMD uvicorn).
+
+Подтверждение после фикса:
+
+POST /pubsub/push на URL воркера возвращает 400 {"detail":"Invalid Pub/Sub message"} на {} — это ожидаемо для невалидного payload (маршрут существует).
+
+Job’ы переходят в DONE и пишут результат (ocr, reference, match: true) — подтверждено минимум двумя job_id.
+
+B) Фиксация рабочего воркер-билда в GCP (pin/release)
+
+Текущий рабочий воркер-образ помечен тегом в Artifact Registry:
+
+.../ocr-worker:prod-20260212 → тот же digest, что и ...:workerfix-1770893776.
+
+Активная ревизия воркера на Cloud Run (на момент фиксации): ocr-worker-00012-bjb.
+
+C) Регрессия: автодеплой checker (ocr-checker) начал падать после git push
+
+Симптом (Cloud Build step gcloud run deploy ocr-checker):
+The user-provided container failed to start and listen on PORT=8080.
+
+Root cause найден по логам ревизии: контейнер падает при старте из-за SyntaxError в zip_processor.py:
+
+в файле остались merge-маркеры <<<<<<< HEAD ... ======= ... >>>>>>>, из-за чего импорт zip_processor ломается, и uvicorn не поднимает приложение.
+
+Следствие: Cloud Run health check не проходит → деплой ocr-checker фейлится, хотя docker build/push успешны.
+
+D) Текущее действие для устранения регрессии (what to commit)
+
+В репозитории нужно убрать merge-маркеры и оставить рабочий код zip_processor.py (вариант без маркеров, компилируется python -m py_compile).
+
+После коммита фикса — ожидается, что Cloud Build триггер снова сможет задеплоить ocr-checker.
+
+
 AI_PROGRESS — UPDATE 2026-02-12 (PENDING fixed; worker restored; release pinned)
 
 What was fixed (root cause, factual):
