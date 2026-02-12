@@ -4,13 +4,9 @@ import os
 import shutil
 from pathlib import Path
 from typing import List, Tuple
-<<<<<<< HEAD
+
 from docx import Document
 import io
-=======
-from io import BytesIO  # ← добавить
-from docx import Document
->>>>>>> f5e11fa2298c861943e882b6f473103beec8d0eb
 
 
 def parse_zip_streaming(zip_path: str) -> List[Tuple[str, str, str]]:
@@ -65,11 +61,7 @@ def extract_text(file_bytes: bytes, ext: str) -> str:
         return file_bytes.decode("utf-8", errors="ignore").strip()
 
     if ext == ".docx":
-<<<<<<< HEAD
         doc = Document(io.BytesIO(file_bytes))
-=======
-        doc = Document(BytesIO(file_bytes))  # ← ключевое изменение
->>>>>>> f5e11fa2298c861943e882b6f473103beec8d0eb
         return "\n".join(p.text.strip() for p in doc.paragraphs if p.text.strip())
 
     return ""
