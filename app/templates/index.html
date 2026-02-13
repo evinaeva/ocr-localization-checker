@@ -84,12 +84,12 @@
         <tr>
             <td><pre>{{ r.image }}</pre></td>
             <td><pre>{{ r.reference }}</pre></td>
-            <td><pre>{{ r.ocr_vision }}</pre></td>
+            <td><pre>{{ r.ocr }}</pre></td>
             <td>
                 {% if r.match %}
-                    <span class="status-pass">{{ r.status }}</span>
+                    <span class="status-pass">PASS</span>
                 {% else %}
-                    <span class="status-manual">{{ r.status }}</span>
+                    <span class="status-manual">MANUAL</span>
                 {% endif %}
             </td>
         </tr>
