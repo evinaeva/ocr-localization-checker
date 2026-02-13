@@ -4,28 +4,37 @@ options:
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
-      - 'build'
-      - '-t'
-      - 'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker'
-      - '.'
+      [
+        'build',
+        '-t',
+        'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker:$SHORT_SHA',
+        '.'
+      ]
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
-      - 'push'
-      - 'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker'
+      [
+        'push',
+        'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker:$SHORT_SHA'
+      ]
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
-      - 'run'
-      - 'deploy'
-      - 'ocr-checker'
-      - '--image'
-      - 'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker'
-      - '--region'
-      - 'europe-west1'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated'
-      - '--service-account'
-      - 'ocr-service-account@$PROJECT_ID.iam.gserviceaccount.com'
+      [
+        'run',
+        'deploy',
+        'ocr-checker',
+        '--image',
+        'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker:$SHORT_SHA',
+        '--region',
+        'europe-west1',
+        '--platform',
+        'managed',
+        '--allow-unauthenticated',
+        '--service-account',
+        'ocr-service-account@$PROJECT_ID.iam.gserviceaccount.com'
+      ]
+
+images:
+  - 'europe-north1-docker.pkg.dev/$PROJECT_ID/ocr-checker/ocr-checker:$SHORT_SHA'
