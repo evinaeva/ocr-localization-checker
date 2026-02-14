@@ -3,6 +3,194 @@ ____________________________________________________________________________
 Updates
 ____________________________________________________________________________
 
+14.02.26
+# Critical Fixes Applied - OCR Section Matching
+
+## Summary of Changes
+
+All critical and major issues from the review have been fixed surgically without changing APIs, endpoints, or schemas.
+
+---
+
+## CRITICAL FIX 1️⃣: Blank-Line Fallback Segmentation
+
+**Problem:**
+- `_extract_text_from_docx()` stripped empty lines with `if text: lines.append(text)`
+- `_segment_by_blank_lines()` relied on empty lines to detect section boundaries
+- Result: Blank-line segmentation never worked, localized headers failed
+
+**Fix:**
+- Changed extraction to preserve empty lines: `lines.append(text)` (always append, even if empty)
+- Iterates through `doc.element.body` to process paragraphs and tables in document order
+- Empty paragraphs/cells now append `""` to the lines list
+- `_segment_by_blank_lines()` can now correctly detect 2+ consecutive blank lines
+
+**Files Changed:**
+- `docx_section_extractor.py` → `_extract_text_from_docx()` completely rewritten
+
+---
+
+## CRITICAL FIX 2️⃣: Document Order Preservation
+
+**Problem:**
+- Old code extracted all paragraphs first, then all tables
+- This broke logical section ordering in mixed documents
+
+**Fix:**
+- Iterate through `doc.element.body` in order
+- Check `isinstance(element, CT_P)` for paragraphs
+- Check `isinstance(element, CT_Tbl)` for tables
+- Extract in true document order
+
+**Files Changed:**
+- `docx_section_extractor.py` → `_extract_text_from_docx()` uses XML body iteration
+
+---
+
+## MAJOR FIX 3️⃣: Correct source_path
+
+**Problem:**
+- Code passed `img_path` (e.g., "images/banner_01_en.png") to `extract_section_candidates()`
+- Should pass DOCX filename instead
+
+**Fix:**
+- Derive DOCX filename from `img_path`:
+  ```python
+  ref_path = img_path.replace("images/", "texts/").rsplit(".", 1)[0]
+  docx_filename = os.path.basename(ref_path + ".docx")
+  ```
+- Pass `docx_filename` to `extract_section_candidates()`
+
+**Files Changed:**
+- `worker_main.py` → line where `extract_section_candidates()` is called
+- `app_main.py` → same fix
+
+---
+
+## MAJOR FIX 4️⃣: ja/zh Character-Based Length Mismatch
+
+**Problem:**
+- Length mismatch penalty used `len(text.split())` (word count) for all languages
+- Japanese/Chinese don't use whitespace, so word count is meaningless
+
+**Fix:**
+- In `_score_candidate()`, check language:
+  ```python
+  if candidate.language in ("ja", "zh-Hans"):
+      ocr_len = _count_chars_no_whitespace(ocr_text_soft)
+      candidate_len = _count_chars_no_whitespace(candidate_text_soft)
+  else:
+      ocr_len = len(ocr_text_soft.split())
+      candidate_len = len(candidate_text_soft.split())
+  ```
+
+**Files Changed:**
+- `reference_matcher.py` → `_score_candidate()`
+
+---
+
+## MAJOR FIX 5️⃣: Robust Placeholder Detection
+
+**Problem:**
+- Old regex: `%[a-zA-Z_][a-zA-Z0-9_]*%` only matched ASCII identifiers
+- Failed on non-ASCII like `%日本語%`
+
+**Fix:**
+- Changed to:
+  ```python
+  re.compile(r"%[^%]+%")  # Any content between %
+  re.compile(r"\[[a-zA-Z_][a-zA-Z0-9_]*\]")  # [identifier]
+  ```
+- Now detects `%任何内容%`, `%日本語%`, `%skin%`
+- Placeholder detection runs on original `candidate.content_text` (before bracket removal)
+
+**Files Changed:**
+- `reference_matcher.py` → `PLACEHOLDER_PATTERNS`, `_has_placeholder()`
+
+---
+
+## MAJOR FIX 6️⃣: Delta Rule Test Assertions
+
+**Problem:**
+- `test_delta_rule_triggers_manual()` didn't assert `manual_required == True`
+- Test could pass even if delta rule was broken
+
+**Fix:**
+- Renamed to `test_delta_rule_triggers_manual_strict()`
+- Now explicitly asserts:
+  ```python
+  assert selection.delta < 0.05
+  assert selection.manual_required is True
+  assert "ambiguous" in warnings or "delta" in warnings
+  ```
+- Test will fail if delta logic is broken
+
+**Files Changed:**
+- `test_reference_matching.py` → renamed and strengthened test
+
+---
+
+## MAJOR FIX 7️⃣: UI Manual Count Correction
+
+**Problem:**
+- `manual_count = sum(1 for r in results.values() if not r["match"])`
+- Incorrectly inferred manual from match flag
+- Should use `selection["manual_required"]`
+
+**Fix:**
+- Changed to:
+  ```python
+  manual_count = sum(
+      1 for r in results.values()
+      if r.get("selection", {}).get("manual_required", False)
+  )
+  ```
+
+**Files Changed:**
+- `app_main.py` → manual count calculation
+
+---
+
+## Self-Review Checklist
+
+✅ **Blank-line fallback works:** Empty lines preserved, segmentation fixed  
+✅ **Document order preserved:** XML body iteration maintains order  
+✅ **ja/zh length logic applied:** Character count for Asian languages  
+✅ **Placeholder detection robust:** `%任何内容%` and `[identifier]` caught  
+✅ **Delta rule triggers manual:** Test explicitly verifies delta < 0.05 → manual  
+✅ **UI manual_count uses manual_required:** Correct flag checked  
+✅ **source_path is DOCX filename:** Not img_path  
+
+---
+
+## Production Safety
+
+- ✅ No API changes
+- ✅ No endpoint signature changes
+- ✅ No Firestore schema changes
+- ✅ Backward compatible
+- ✅ Deterministic (no randomness)
+- ✅ All tests passing
+
+---
+
+## Files Delivered
+
+1. `docx_section_extractor.py` (fixed)
+2. `reference_matcher.py` (fixed)
+3. `worker_main.py` (fixed)
+4. `app_main.py` (fixed)
+5. `test_reference_matching.py` (fixed)
+6. `FIXES_SUMMARY.md` (this file)
+
+---
+
+**Status:** ✅ All critical and major issues fixed  
+**Ready for:** Production deployment
+
+
+
+
 AI_PROGRESS — UPDATE 2026-02-12 (worker fixed & pinned; checker deploy broken by merge markers; root cause identified)
 
 A) Worker (ocr-worker) восстановлен и подтверждён E2E
