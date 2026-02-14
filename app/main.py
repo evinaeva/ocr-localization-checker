@@ -1,5 +1,6 @@
 import tempfile
 import os
+import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, Request
@@ -14,8 +15,10 @@ BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 app = FastAPI()
+
 from app.jobs_api import router as jobs_router
 app.include_router(jobs_router)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -24,8 +27,8 @@ async def index(request: Request):
 
 @app.post("/", response_class=HTMLResponse)
 async def upload_zip(request: Request, zip_file: UploadFile = File(...)):
-
     tmp_path = None
+    work_dir = None
 
     try:
         # 1. Пишем ZIP во временный файл, НЕ в память
@@ -41,7 +44,7 @@ async def upload_zip(request: Request, zip_file: UploadFile = File(...)):
             tmp.flush()
 
         # 2. Стриминговый парсинг ZIP
-        matches = parse_zip_streaming(tmp_path)
+        matches, work_dir = parse_zip_streaming(tmp_path, return_work_dir=True)
 
         results = {}
 
@@ -51,7 +54,6 @@ async def upload_zip(request: Request, zip_file: UploadFile = File(...)):
                 img_bytes = f.read()
 
             ocr_text = process_image(img_bytes)
-
             is_match = ocr_text.strip() == ref_text.strip()
 
             results[img_path] = {
@@ -59,7 +61,7 @@ async def upload_zip(request: Request, zip_file: UploadFile = File(...)):
                 "reference": ref_text,
                 "ocr": ocr_text,
                 "match": is_match,
-                "status": "✅ PASS" if is_match else "❓ MANUAL"
+                "status": "✅ PASS" if is_match else "❓ MANUAL",
             }
 
         total = len(matches)
@@ -71,11 +73,13 @@ async def upload_zip(request: Request, zip_file: UploadFile = File(...)):
                 "request": request,
                 "results": results,
                 "total_files": total,
-                "manual_count": manual_count
-            }
+                "manual_count": manual_count,
+            },
         )
 
     finally:
         # 3. Гарантированно чистим временный ZIP
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
+        if work_dir:
+            shutil.rmtree(work_dir, ignore_errors=True)

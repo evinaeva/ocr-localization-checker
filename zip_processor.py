@@ -3,14 +3,27 @@ import tempfile
 import os
 import shutil
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from docx import Document
 import io
 
 
-def parse_zip_streaming(zip_path: str) -> List[Tuple[str, str, str]]:
-    results = []
+def parse_zip_streaming(
+    zip_path: str,
+    *,
+    return_work_dir: bool = False,
+) -> Union[List[Tuple[str, str, str]], Tuple[List[Tuple[str, str, str]], str]]:
+    """
+    Парсит ZIP и извлекает изображения во временную директорию.
+
+    ВАЖНО:
+    - Если return_work_dir=False (по умолчанию) — возвращает только matches (backward-compatible).
+      В этом режиме ответственность за cleanup остаётся вне функции (как и было раньше).
+    - Если return_work_dir=True — возвращает (matches, work_dir), и caller обязан удалить work_dir.
+      Это нужно, чтобы корректно убрать утечки temp-файлов, не ломая логику чтения img_file_path.
+    """
+    results: List[Tuple[str, str, str]] = []
     work_dir = tempfile.mkdtemp(prefix="ocr_zip_")
 
     images = {}
@@ -24,7 +37,9 @@ def parse_zip_streaming(zip_path: str) -> List[Tuple[str, str, str]]:
                 if name.endswith("/"):
                     continue
 
-                if name.startswith("images/") and name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                name_lower = name.lower()
+
+                if name.startswith("images/") and name_lower.endswith((".png", ".jpg", ".jpeg", ".webp")):
                     base_name = os.path.basename(name)
                     tmp_img_path = os.path.join(work_dir, base_name)
 
@@ -33,7 +48,7 @@ def parse_zip_streaming(zip_path: str) -> List[Tuple[str, str, str]]:
 
                     images[name] = tmp_img_path
 
-                if name.startswith("texts/") and name.lower().endswith((".txt", ".docx")):
+                if name.startswith("texts/") and name_lower.endswith((".txt", ".docx")):
                     with zf.open(info) as src:
                         txt_bytes = src.read()
                     texts[name] = txt_bytes
@@ -44,19 +59,24 @@ def parse_zip_streaming(zip_path: str) -> List[Tuple[str, str, str]]:
             ref_text = ""
             for txt_path, txt_bytes in texts.items():
                 if prefix in Path(txt_path).stem:
-                    ref_text = extract_text(txt_bytes, Path(txt_path).suffix)
+                    ref_text = extract_text(txt_bytes, Path(txt_path).suffix.lower())
                     break
 
             results.append((img_path, img_tmp_path, ref_text))
 
+        if return_work_dir:
+            return results, work_dir
         return results
 
     except Exception:
+        # При ошибке cleanup делаем здесь, чтобы не оставлять мусор
         shutil.rmtree(work_dir, ignore_errors=True)
         raise
 
 
 def extract_text(file_bytes: bytes, ext: str) -> str:
+    ext = ext.lower()
+
     if ext == ".txt":
         return file_bytes.decode("utf-8", errors="ignore").strip()
 
